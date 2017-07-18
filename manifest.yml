@@ -1,0 +1,15 @@
+---
+declared-services:
+  vodacom-conversation-service:
+    label: conversation
+    plan: free
+applications:
+- name: ibm-vodacom-chatbot-v3
+  command: npm start
+  path: .
+  memory: 256M
+  instances: 1
+  services:
+  - vodacom-conversation-service-v3
+  env:
+    NPM_CONFIG_PRODUCTION: false
