@@ -14,18 +14,22 @@
  * limitations under the License.
  */
 var mysql = require('mysql');
+var sync = require('synchronize');
 var Regex = require('regex');
 var syncSql = require('sync-sql');
 var express = require('express'); // app server
 var S = require('string');
 var bodyParser = require('body-parser'); // parser for post requests
 var Conversation = require('watson-developer-cloud/conversation/v1'); // watson sdk
+var DiscoveryV1 = require('watson-developer-cloud/discovery/v1');	
 var logs = null;
 var connection = null;
 var inputText = null;
 var outputText = null;
 var regexTest = null;
 var app = express();
+var sleep = require('sleep');
+var striptags = require('striptags');
 
 // Bootstrap application settings
 app.use(express.static('./public')); // load UI from public folder
@@ -33,6 +37,13 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
   extended: true
 }));
+
+
+var fiber = sync.fiber;
+var await = sync.await;
+var defer = sync.defer;
+
+
 
 // Create the service wrapper
 var conversation = new Conversation({
@@ -45,6 +56,8 @@ var conversation = new Conversation({
   version: 'v1'
 });
 
+
+var discovery = new DiscoveryV1({ username: 'a5bd73de-7ef3-4539-b997-f6daa5835752', password: '2YoMQfEmv8H7',version_date:'2017-07-19' })
 
 // Endpoint to be call from the client side
 app.post('/api/message', function(req, res) {
@@ -65,6 +78,10 @@ app.post('/api/message', function(req, res) {
   // Send the input to the conversation service
 
   conversation.message(payload, function(err, data) {
+
+	try {
+	    fiber(function() {
+
     if (err) {
       //return res.status(err.code || 500).json(err);
 	  res.status(err.code >= 100 && err.code < 600 ? err.code : 500);
@@ -185,10 +202,47 @@ app.post('/api/message', function(req, res) {
 			} 
 	
 	}
-	/*if (data != null && data.intents.intent == "escalation") {
+
+
+	//sync(discovery,'query');
+	if (data != null && data.intents[0]!=null && data.intents[0].intent == "escalation") {
 		
-		console.log(JSON.stringify(data));
-	}*/
+		//outputText = null;
+		//console.log(JSON.stringify(data));
+		//outputText = orchestrateBotResponseTextForEscalations(inputText);
+
+		//data = discovery.query({environment_id:'85501829-fa57-41c6-b483-52295105bf2c',collection_id:'2e7246ce-7509-49bc-8db2-1137cb926f33',query: inputText,passages: true,count:1});
+
+		//data = orchestrateBotResponseTextForEscalations("show me escalation");
+		
+
+
+
+
+
+	        //var obj1 = await( someAsyncMethod( defer() ) );
+	        datadisc = await(discovery.query({environment_id:'85501829-fa57-41c6-b483-52295105bf2c',collection_id:'2e7246ce-7509-49bc-8db2-1137cb926f33',query: inputText,passages: true,count:1}, 
+	        	defer()));
+
+	        outputText = "The top most relevant passages from shift reports are below: <br><br>" 
+	        	+JSON.stringify(striptags(datadisc["passages"][0]["passage_text"],null,2)) + "<br><br>"
+	        	+JSON.stringify(striptags(datadisc["passages"][1]["passage_text"],null,2)) + "<br><br>"
+	        	+JSON.stringify(striptags(datadisc["passages"][2]["passage_text"],null,2)); 
+	        console.log(JSON.stringify(datadisc));
+	        //await(console.log(JSON.stringify(datadisc)));
+
+
+		//sleep.sleep(10);
+		//outputText = JSON.stringify(data["passages"][0]["passage_text"],null,2);
+		//console.log(JSON.stringify(data))
+		
+
+		//outputText = inputText;	
+
+
+		
+		//outputText = inputText;	
+	}
 	
 	
 	
@@ -200,7 +254,10 @@ app.post('/api/message', function(req, res) {
 		//console.log(data.output.text);
     return res.json(updateMessage(payload, data));
 
-	
+		    });
+	} catch(err) {
+    	//TODO Handle error
+	}
  
 });
 
@@ -338,7 +395,15 @@ function orchestrateBotResponseTextForShiftReports (dbQueryResult) {
 	return responseText;
 }
 
-
+function orchestrateBotResponseTextForEscalations (discQuery) {
+	result = null
+	discovery.query({environment_id:'85501829-fa57-41c6-b483-52295105bf2c',collection_id:'2e7246ce-7509-49bc-8db2-1137cb926f33',query: discQuery,passages: true,count:1}, 
+			function(error,data) 
+				{return JSON.stringify(data["passages"][0]["passage_text"],null,2);
+			}
+		);
+	//sleep.sleep(10)
+}
  
 
 /**
